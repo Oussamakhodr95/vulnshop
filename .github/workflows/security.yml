@@ -1,0 +1,70 @@
+name: Security Pipeline
+
+# Run security scans on every push and every pull request to main.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ------------------------------------------------------------------
+  # JOB 1 — SAST: read the source code and look for vulnerable patterns
+  # ------------------------------------------------------------------
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/python
+            p/flask
+            p/owasp-top-ten
+            p/secrets
+        # If Semgrep finds a blocking issue, the job fails and the pipeline
+        # goes red — which is exactly how a real gate would stop bad code.
+
+  # ------------------------------------------------------------------
+  # JOB 2 — DAST: start the running app and attack it from the outside
+  # ------------------------------------------------------------------
+  dast:
+    name: DAST (OWASP ZAP)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Seed the database
+        run: python init_db.py
+
+      - name: Start the app in the background
+        run: |
+          nohup python app.py > app.log 2>&1 &
+          # give the server a few seconds to come up
+          for i in $(seq 1 15); do
+            if curl -s http://localhost:5000/ >/dev/null; then
+              echo "App is up"; break
+            fi
+            sleep 1
+          done
+
+      - name: ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: "http://localhost:5000"
+          # -I = do not fail the build on warnings (baseline finds many).
+          # Remove -I later if you want warnings to block the pipeline.
+          cmd_options: "-I"

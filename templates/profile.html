@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>VulnShop - Profile</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background:#0f1115; color:#e6e6e6; margin:0; padding:2rem; }
+    a { color:#4f7cff; }
+    .row { margin:.3rem 0; }
+    .label { color:#8a8f98; display:inline-block; width:120px; }
+  </style>
+</head>
+<body>
+  <h1>Profile</h1>
+  <div class="row"><span class="label">User ID</span> {{ profile["id"] }}</div>
+  <div class="row"><span class="label">Username</span> {{ profile["username"] }}</div>
+  <div class="row"><span class="label">Email</span> {{ profile["email"] }}</div>
+  <div class="row"><span class="label">Credit card</span> {{ profile["credit_card"] }}</div>
+  <p><a href="/dashboard">&larr; Back</a></p>
+</body>
+</html>

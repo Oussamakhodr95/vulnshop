@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+vulnshop.db
+venv/
+.venv/
+*.html.report
+zap-report.html
+.env

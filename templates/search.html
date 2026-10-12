@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>VulnShop - Search</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background:#0f1115; color:#e6e6e6; margin:0; padding:2rem; }
+    a { color:#4f7cff; }
+  </style>
+</head>
+<body>
+  <h1>Search results</h1>
+  {% if raw %}
+    <!-- VULN: |safe disables escaping, so query is injected as raw HTML -->
+    <p>You searched for: {{ query|safe }}</p>
+  {% else %}
+    <!-- FIX: default autoescaping turns any HTML into harmless text -->
+    <p>You searched for: {{ query }}</p>
+  {% endif %}
+  <p><a href="/dashboard">&larr; Back</a></p>
+</body>
+</html>
