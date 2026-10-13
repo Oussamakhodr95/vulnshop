@@ -10,13 +10,8 @@
 </head>
 <body>
   <h1>Search results</h1>
-  {% if raw %}
-    <!-- VULN: |safe disables escaping, so query is injected as raw HTML -->
-    <p>You searched for: {{ query|safe }}</p>
-  {% else %}
-    <!-- FIX: default autoescaping turns any HTML into harmless text -->
-    <p>You searched for: {{ query }}</p>
-  {% endif %}
+  <!-- FIX: default autoescaping turns any HTML into harmless text -->
+  <p>You searched for: {{ query }}</p>
   <p><a href="/dashboard">&larr; Back</a></p>
 </body>
 </html>

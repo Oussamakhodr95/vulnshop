@@ -69,10 +69,10 @@ def profile():
     if "user" not in session:
         return redirect("/")
 
-    # VULN: IDOR — the id comes from the URL and is never checked against
+    # FIX: user id comes from the session only, never from the URL
     # the logged-in user, so /profile?id=1 shows anyone's profile.
     # Try:  /profile?id=1  while logged in as a different user.
-    user_id = request.args.get("id", session.get("user_id"))
+    user_id = session["user_id"]
     db = get_db()
     cur = db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     row = cur.fetchone()
@@ -83,10 +83,9 @@ def profile():
 
 @app.route("/search")
 def search():
-    # VULN: reflected XSS — the query is rendered without escaping.
-    # Try:  /search?q=<script>alert(1)</script>
+    # FIX: template autoescapes the query, so HTML is shown as text
     q = request.args.get("q", "")
-    return render_template("search.html", query=q, raw=True)
+    return render_template("search.html", query=q)
 
 
 @app.route("/logout")
