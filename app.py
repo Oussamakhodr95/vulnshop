@@ -10,10 +10,11 @@ The fixed, secure version of this same app lives in app_fixed.py.
 import sqlite3
 import os
 from flask import Flask, request, render_template, redirect, session, g
+from werkzeug.security import check_password_hash
 
 app = Flask(__name__)
-# VULN: hardcoded secret key committed to source control (Semgrep: secrets)
-app.secret_key = "dev-secret-key-12345"
+# FIX: secret key comes from the environment, never from source code
+app.secret_key = os.environ["SECRET_KEY"]
 
 DATABASE = "vulnshop.db"
 
@@ -47,10 +48,10 @@ def login():
 
     # FIX: parameterized query, user input is sent as data, never as SQL
     db = get_db()
-    cur = db.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username , password))
+    cur = db.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username,))
     user = cur.fetchone()
-
-    if user:
+    # FIX: compare against the stored hash, never plaintext
+    if user and check_password_hash(user["password"]. password):
         session["user"] = user["username"]
         session["user_id"] = user["id"]
         return redirect("/dashboard")

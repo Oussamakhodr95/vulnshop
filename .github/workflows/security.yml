@@ -42,6 +42,8 @@ jobs:
         run: python init_db.py
 
       - name: Start the app in the background
+        env: 
+          SECRET_KEY:  ${{ secrets.SECRET_KEY}}
         run: |
           nohup python app.py > app.log 2>&1 &
           for i in $(seq 1 15); do

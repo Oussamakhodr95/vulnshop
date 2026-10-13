@@ -19,11 +19,7 @@ cur.execute(
     """
 )
 
-# For the VULNERABLE app, passwords are stored in plaintext (that's part of
-# the point). The FIXED app expects hashes, so we store a hash too and the
-# fixed login verifies it. To keep one DB working for both, we store the
-# plaintext here; when you run the fixed app, re-seed with the hashed version
-# below (see README).
+
 users = [
     ("admin", "SuperSecret123", "admin@vulnshop.local", "4111-1111-1111-1111"),
     ("oussama", "hunter2", "oussama@vulnshop.local", "5500-0000-0000-0004"),
@@ -32,7 +28,7 @@ users = [
 for username, password, email, cc in users:
     cur.execute(
         "INSERT INTO users (username, password, email, credit_card) VALUES (?, ?, ?, ?)",
-        (username, password, email, cc),
+        (username, generate_password_hash(password), email, cc),
     )
 
 conn.commit()
