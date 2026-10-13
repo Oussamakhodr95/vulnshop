@@ -45,17 +45,9 @@ def login():
     username = request.form.get("username", "")
     password = request.form.get("password", "")
 
-    # VULN: SQL injection — user input concatenated straight into the query.
-    # Try username:  admin' --
-    query = (
-        "SELECT * FROM users WHERE username = '"
-        + username
-        + "' AND password = '"
-        + password
-        + "'"
-    )
+    # FIX: parameterized query, user input is sent as data, never as SQL
     db = get_db()
-    cur = db.execute(query)
+    cur = db.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username , password))
     user = cur.fetchone()
 
     if user:
@@ -105,4 +97,5 @@ def logout():
 
 if __name__ == "__main__":
     # VULN: debug mode on in "production" leaks stack traces + enables console
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    debug = os.environ.get("FLASK_DEBUG") == "1"
+    app.run(host="127.0.0.1", port=5000, debug=debug)
