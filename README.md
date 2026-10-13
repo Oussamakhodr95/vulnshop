@@ -1,108 +1,105 @@
 # VulnShop — an Application Security lab
 
-A small, deliberately vulnerable Flask web app, its secure counterpart, and a
-CI/CD security pipeline (SAST + DAST) that runs on every push.
+A small Flask web app that started **deliberately vulnerable**, a CI/CD security
+pipeline that runs **SAST, DAST and SCA** on every push, and the commit history
+of finding and fixing every flaw — the same loop an AppSec team runs every day.
 
-> ⚠️ **VulnShop is insecure on purpose.** Run it only on your own machine.
-> Never deploy it to the public internet.
+![Security Pipeline](https://github.com/Oussamakhodr95/vulnshop/actions/workflows/security.yml/badge.svg)
 
-Built to demonstrate, end to end, how application security works in practice:
-write code → a scanner finds the flaw → fix it → re-scan → automate the whole
-thing so it happens on every commit.
-
----
-
-## What's inside
-
-| File | What it is |
-|------|------------|
-| `app.py` | The **vulnerable** app (SQLi, IDOR, XSS, hardcoded secret, debug on) |
-| `app_fixed.py` | The **secure** version — every flaw fixed, with a comment on each fix |
-| `init_db.py` | Creates the demo database (plaintext passwords, for the vulnerable app) |
-| `init_db_fixed.py` | Same database but with **hashed** passwords, for the fixed app |
-| `templates/` | The HTML pages |
-| `.github/workflows/security.yml` | The CI/CD pipeline: Semgrep (SAST) + OWASP ZAP (DAST) |
-| `requirements.txt` | Python dependencies |
+> The current code is the **fixed** version. To see the original vulnerable app,
+> open the [first commit](https://github.com/Oussamakhodr95/vulnshop/commit/ce9c5da).
+> Each fix after it is a separate commit, so the history reads as before → after.
 
 ---
 
-## The vulnerabilities (and how they're fixed)
+## The security pipeline
 
-| # | Vulnerability | Where | Fix |
-|---|---------------|-------|-----|
-| 1 | **SQL Injection** | `/login` | Parameterized query instead of string concatenation |
-| 2 | **IDOR** | `/profile?id=` | Use the id from the session, ignore the URL |
-| 3 | **Reflected XSS** | `/search?q=` | Let Jinja2 autoescape the output (`|safe` removed) |
-| 4 | **Hardcoded secret** | `app.secret_key` | Read it from an environment variable |
-| 5 | **Debug mode in prod** | `app.run(debug=True)` | `debug=False` |
-| 6 | **Plaintext passwords** | the database | Store and verify password **hashes** |
+`.github/workflows/security.yml` runs three jobs on every push and pull request to `main`:
+
+| Job | Type | Tool | What it checks |
+|-----|------|------|----------------|
+| **SAST** | Static analysis | Semgrep (`p/python`, `p/flask`, `p/secrets`) | The source code, for vulnerable patterns |
+| **DAST** | Dynamic analysis | OWASP ZAP baseline | The running app, from the outside |
+| **SCA** | Dependency scanning | pip-audit | Third-party packages, for known CVEs |
+
+SAST and SCA are **blocking gates**: any finding fails the job and turns the pipeline red.
+DAST runs in report mode (`-I`): warnings such as missing security headers are recorded
+in the ZAP report artifact without blocking, because blocking every low-risk header
+warning teaches developers to ignore the pipeline.
+
+The app's secret key is stored as a **GitHub Actions secret** and injected at runtime;
+it is never in the repository.
+
+---
+
+## What was found, and by what
+
+The app started with six vulnerabilities. The pipeline caught some; others needed a human.
+
+| # | Vulnerability | Found by | Fix |
+|---|---------------|----------|-----|
+| 1 | SQL injection in `/login` | **Semgrep** + manual | Parameterized query |
+| 2 | Flask `debug=True` | **Semgrep** | Debug only when `FLASK_DEBUG=1` is set |
+| 3 | Bound to `0.0.0.0` | **Semgrep** | Bound to `127.0.0.1` (see triage note) |
+| 4 | IDOR on `/profile?id=` | **Manual testing** — missed by tools | User id taken from the session, never the URL |
+| 5 | Reflected XSS on `/search` | **Manual testing** — missed by tools | Removed `\|safe`; Jinja2 autoescaping |
+| 6 | Hardcoded secret key | **Code review** — missed by tools | Read from environment / GitHub Secrets |
+| 7 | Plaintext passwords | **Code review** — missed by tools | Stored and verified as hashes |
+| 8 | Vulnerable Flask & Werkzeug versions | **pip-audit** | Upgraded to `Flask 3.1.3`, `Werkzeug 3.1.9` |
+
+**Triage note on #3:** binding to `0.0.0.0` is required when an app runs inside a
+container, so the same Semgrep finding can be a false positive in one deployment and a
+real issue in another. Here the app runs directly on the host, so it was fixed.
+
+---
+
+## What I learned
+
+- **Green does not mean secure.** After the pipeline went green, IDOR and XSS were
+  still exploitable. Access control and logic flaws need manual testing.
+- **Red does not always mean a vulnerability.** Two early red runs were caused by the
+  pipeline itself (a ZAP action that tried to open issues without permission, and an
+  outdated version whose artifact upload no longer worked). You have to read *why* a
+  job failed.
+- **A scanner that never fails is worse than none.** The first Semgrep setup reported
+  findings but still passed. Adding `--error` is what turned it into a real gate.
+- **Fix the cause, not the instance.** For dependencies, one upgrade to the highest
+  fixed version closed every CVE at once. For XSS, the unsafe template branch was
+  removed entirely instead of just avoided.
+- **Verify both directions.** Every fix was tested to confirm the attack fails *and*
+  normal use still works.
 
 ---
 
 ## Run it locally
 
 ```bash
-# 1. set up
 python -m venv .venv
-source .venv/bin/activate         # Windows: .venv\Scripts\activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# 2. the VULNERABLE app
+export SECRET_KEY="local-dev-only" # Windows PowerShell: $env:SECRET_KEY="local-dev-only"
 python init_db.py
-python app.py                     # http://localhost:5000
+python app.py                      # http://localhost:5000
 ```
 
-Now try the attacks by hand:
+Demo users: `admin` / `SuperSecret123`, `oussama` / `hunter2`.
 
-- **SQL injection** — log in with username `admin' --` and any password. You're in.
-- **IDOR** — once logged in, open `/profile?id=1`, then `/profile?id=2`. You can
-  read another user's email and credit card.
-- **XSS** — open `/search?q=<script>alert(1)</script>`. The script runs.
-
-Then run the **fixed** app and try the same attacks — they all fail:
+## Run the scans locally
 
 ```bash
-python init_db_fixed.py
-SECRET_KEY=change-me python app_fixed.py    # Windows: set SECRET_KEY first
-```
+# SAST
+semgrep scan --config p/python --config p/flask --config p/secrets --error .
 
----
+# SCA
+pip-audit -r requirements.txt
 
-## Scan it yourself (what the pipeline automates)
-
-**SAST — read the code:**
-```bash
-pip install semgrep
-semgrep --config p/python --config p/flask --config p/owasp-top-ten --config p/secrets app.py
-```
-
-**DAST — attack the running app:**
-```bash
-# with the app running on :5000
+# DAST (with the app running on :5000)
 docker run --rm -t ghcr.io/zaproxy/zaproxy:stable \
   zap-baseline.py -t http://host.docker.internal:5000
 ```
 
 ---
 
-## The CI/CD pipeline
-
-`.github/workflows/security.yml` runs on every push and pull request to `main`:
-
-1. **SAST job** — checks out the code and runs Semgrep over it.
-2. **DAST job** — installs the app, starts it, and runs an OWASP ZAP baseline
-   scan against the live instance.
-
-Push the vulnerable `app.py` and the SAST job goes **red**. Fix it, push again,
-and it goes **green**. That red/green gate is the whole point of "shifting
-security left" — problems are caught automatically, before code reaches
-production, instead of months later in a pentest.
-
----
-
-## What this demonstrates
-
-- The full AppSec loop: **find → verify → fix → re-scan → automate**
-- Hands-on SAST (Semgrep) and DAST (OWASP ZAP)
-- Secure coding fixes for the most common web vulnerabilities (OWASP Top 10)
-- Integrating security into CI/CD with GitHub Actions
+> ⚠️ This is a learning project. The first commit contains intentionally vulnerable
+> code. Don't deploy any version of it to the public internet.
