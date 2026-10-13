@@ -58,3 +58,23 @@ jobs:
           cmd_options: "-I"
           # don't try to open a GitHub issue (needs extra permissions)
           allow_issue_writing: false
+  # SCA: check third-party dependencies for known vulnerabilities (CVEs)
+  sca:
+    name: SCA (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Scan dependencies
+        # pip-audit exits with code 1 if any vulnerable package is found,
+        # so the job fails and the pipeline goes red.
+        run: pip-audit -r requirements.txt
